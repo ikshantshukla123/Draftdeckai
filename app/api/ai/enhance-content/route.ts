@@ -24,7 +24,25 @@ export async function POST(request: NextRequest) {
 
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
-    if (authError || !user) {
+    if (authError) {
+      const isUpstreamFailure =
+        (authError.status !== undefined && authError.status >= 500) ||
+        /timeout|ECONNREFUSED|ECONNRESET|network/i.test(authError.message ?? '');
+
+      if (isUpstreamFailure) {
+        return NextResponse.json(
+          { error: 'Authentication service unavailable. Please try again later.' },
+          { status: 503 }
+        );
+      }
+
+      return NextResponse.json(
+        { error: 'Authentication required. Please sign in.' },
+        { status: 401 }
+      );
+    }
+
+    if (!user) {
       return NextResponse.json(
         { error: 'Authentication required. Please sign in.' },
         { status: 401 }
